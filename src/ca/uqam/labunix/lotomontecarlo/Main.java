@@ -3,6 +3,7 @@ package ca.uqam.labunix.lotomontecarlo;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -105,13 +106,11 @@ public class Main {
 	private static ConcurrentHashMap<Integer, Integer> playPIF(final List<Integer> combinaison, int loop) {
 		ConcurrentHashMap<Integer,Integer> result = initResultConcurrent(combinaison);
 
-		Set<Future<Integer>> set = new HashSet<Future<Integer>>();
-
-		ExecutorService executor = Executors.newFixedThreadPool(loop);
+		ExecutorService executor = Executors.newFixedThreadPool(_processors);
+		Collection<Callable<Integer>> tasks = new ArrayList<Callable<Integer>>();
 		
 		for (int i = 0; i < loop; i++) {
-			Callable<Integer> worker = new Callable<Integer>() {
-
+			tasks.add(new Callable<Integer>() {
 				@Override
 				public Integer call() throws Exception {
 					List<Integer> numbers = new ArrayList<Integer>();
@@ -131,19 +130,18 @@ public class Main {
 					}
 					return compteur;
 				}
-
-			};
-			Future<Integer> res = executor.submit(worker);
-			set.add(res);
+			});
 		}
-
+		
+		List<Future<Integer>> resu;
 		try {
-			for (Future<Integer> res : set) {
+			resu = executor.invokeAll(tasks);
+			for (Future<Integer> res : resu) {
 				result.put(res.get(), result.get(res.get()) + 1);
 			}
-		} catch (InterruptedException | ExecutionException e) {
+		} catch (InterruptedException | ExecutionException e1) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			e1.printStackTrace();
 		}
 
 		executor.shutdown();
