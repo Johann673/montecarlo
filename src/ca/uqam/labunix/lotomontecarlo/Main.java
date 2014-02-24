@@ -6,18 +6,25 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Main {
 	
 	private static int _range = 36;
+	private static int _processors = Runtime.getRuntime().availableProcessors();
 
 	/**
 	 * arguments de la forme :
-	 * 	1.2.3.4.5 10000
+	 * 	1.2.3.4.5.6 10000
 	 * avec 
-	 * 		1.2.3.4.5 : combinaison gagnante
+	 * 		1.2.3.4.5.6 : combinaison gagnante
 	 * 		10000 : nombre de tests à faire
 	 * @param args 
 	 */
@@ -39,7 +46,7 @@ public class Main {
 		long begin = System.currentTimeMillis();
 		
 		// Test en séquentiel
-		HashMap<Integer,Integer> result = playSequentiel(combi, loop);
+		HashMap<Integer,Integer> result = playPIF(combi, loop);
 		
 		long end = System.currentTimeMillis();
         System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
@@ -57,16 +64,9 @@ public class Main {
 		
 	}
 
-	private static void printResult(int loop, HashMap<Integer, Integer> result) {
-		NumberFormat format = new DecimalFormat("#.#####");
-		for (Entry<Integer,Integer> e : result.entrySet()) {
-			Integer key = e.getKey();
-	        Integer value = e.getValue();
-	        System.out.println(key + " : " + format.format((value * 100) / (double)loop) + "%");
-		}
-	}
+	
 
-	private static HashMap<Integer,Integer> playSequentiel(List<Integer> combinaison, int loop) {
+	private static HashMap<Integer,Integer> playS(List<Integer> combinaison, int loop) {
 		// List du nombre de bonnes combinaisons
 		HashMap<Integer,Integer> result = initResult(combinaison);
 		 
@@ -93,10 +93,67 @@ public class Main {
 		
 		return result;
 	}
+	
+	private static HashMap<Integer,Integer> playPIF(final List<Integer> combinaison, int loop) {
+		ConcurrentHashMap<Integer,Integer> result = initResultConcurrent(combinaison);
+		
+		ExecutorService executor = Executors.newFixedThreadPool(loop);
+	    for (int i = 0; i < loop; i++) {
+	    	Callable<Integer> worker = new Callable<Integer>() {
+
+				@Override
+				public Integer call() throws Exception {
+					List<Integer> numbers = new ArrayList<Integer>();
+					int compteur = 0;
+					// Simule un tirage
+					for (int j = 0; j < combinaison.size(); j++) {
+						int k = 0;
+						do {
+							k = getRandomValue(1, _range);
+						} while (numbers.contains(k)); // un nombre ne peut être tiré qu'une seule fois
+						numbers.add(k);
+						
+						// On regarde si le nombre est dans la combinaison gagnante
+						if(combinaison.contains(k)) {
+							compteur++;
+						}
+					}
+					return compteur;
+				}
+	    	  
+	    	};
+	    	Future<Integer> res = executor.submit(worker);
+	    	try {
+				result.put(res.get(), result.get(res) + 1);
+			} catch (InterruptedException | ExecutionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	    }
+		
+		return null;
+	}
+	
+	private static void printResult(int loop, HashMap<Integer, Integer> result) {
+		NumberFormat format = new DecimalFormat("#.#####");
+		for (Entry<Integer,Integer> e : result.entrySet()) {
+			Integer key = e.getKey();
+	        Integer value = e.getValue();
+	        System.out.println(key + " : " + format.format((value * 100) / (double)loop) + "%");
+		}
+	}
 
 	//Initialise le HashMap avec le nombre d'éléments
 	private static HashMap<Integer, Integer> initResult(List<Integer> combinaison) {
 		HashMap<Integer, Integer> result = new HashMap<Integer, Integer>();
+		for (int i = 0; i < combinaison.size() + 1; i++) {
+			result.put(i, 0);
+		}
+		return result;
+	}
+	
+	private static ConcurrentHashMap<Integer, Integer> initResultConcurrent(List<Integer> combinaison) {
+		ConcurrentHashMap<Integer, Integer> result = new ConcurrentHashMap<Integer, Integer>();
 		for (int i = 0; i < combinaison.size() + 1; i++) {
 			result.put(i, 0);
 		}
