@@ -3,7 +3,6 @@ package ca.uqam.labunix.lotomontecarlo;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,7 +56,7 @@ public class Main {
 		begin = System.currentTimeMillis();
 		// Test en séquentiel
 		//HashMap<Integer,Integer> result = playPIF(combi, loop);
-		ConcurrentHashMap<Integer, Integer> result2 = playPIF(combi, loop);
+		ConcurrentHashMap<Integer, Integer> result2 = playPIGA(combi, loop);
 		end = System.currentTimeMillis();
 		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
 		// Affiche le resultat
@@ -103,14 +102,16 @@ public class Main {
 		return result;
 	}
 
-	private static ConcurrentHashMap<Integer, Integer> playPIF(final List<Integer> combinaison, int loop) {
+	private static ConcurrentHashMap<Integer, Integer> playPIGA(final List<Integer> combinaison, int _processors) {
 		ConcurrentHashMap<Integer,Integer> result = initResultConcurrent(combinaison);
 
+		Set<Future<Integer>> set = new HashSet<Future<Integer>>();
+
 		ExecutorService executor = Executors.newFixedThreadPool(_processors);
-		Collection<Callable<Integer>> tasks = new ArrayList<Callable<Integer>>();
 		
-		for (int i = 0; i < loop; i++) {
-			tasks.add(new Callable<Integer>() {
+		for (int i = 0; i < _processors; i++) {
+			Callable<Integer> worker = new Callable<Integer>() {
+
 				@Override
 				public Integer call() throws Exception {
 					List<Integer> numbers = new ArrayList<Integer>();
@@ -130,18 +131,19 @@ public class Main {
 					}
 					return compteur;
 				}
-			});
+
+			};
+			Future<Integer> res = executor.submit(worker);
+			set.add(res);
 		}
-		
-		List<Future<Integer>> resu;
+
 		try {
-			resu = executor.invokeAll(tasks);
-			for (Future<Integer> res : resu) {
+			for (Future<Integer> res : set) {
 				result.put(res.get(), result.get(res.get()) + 1);
 			}
-		} catch (InterruptedException | ExecutionException e1) {
+		} catch (InterruptedException | ExecutionException e) {
 			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			e.printStackTrace();
 		}
 
 		executor.shutdown();
