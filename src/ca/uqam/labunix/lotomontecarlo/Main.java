@@ -57,8 +57,7 @@ public class Main {
 
 		begin = System.currentTimeMillis();
 		// Test en séquentiel
-		//HashMap<Integer,Integer> result = playPIF(combi, loop);
-		HashMap<Integer, Integer> result2 = playPIF(loop);
+		HashMap<Integer, Integer> result2 = playPIGA(loop);
 		end = System.currentTimeMillis();
 		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
 		// Affiche le resultat
@@ -78,7 +77,7 @@ public class Main {
 		return result;
 	}
 
-	private static HashMap<Integer,Integer> playPIF(int loop) throws Exception {
+	private static HashMap<Integer,Integer> playPIGA(int loop) throws Exception {
 		HashMap<Integer,Integer> result = initResult();
 
 		ExecutorService executor = Executors.newFixedThreadPool(_processors);
