@@ -15,7 +15,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class Main {
 
-	private static int _range = 36;
+	private static int _lotoRange = 36;
 	private static int _nbProcessors;
 	private static int _nbTachesDynamic = 100;
 
@@ -45,7 +45,7 @@ public class Main {
 		}
 
 		// Récupère le nombre de tests en paramètre
-		int loop = Integer.parseInt(args[1]);
+		int repeat = Integer.parseInt(args[1]);
 		
 		int procs = Integer.parseInt(args[2]);
 		_nbProcessors = (procs == 0) ? Runtime.getRuntime().availableProcessors() : procs;
@@ -63,56 +63,60 @@ public class Main {
 
 		begin = System.currentTimeMillis();
 		// Test en séquentiel
-		HashMap<Integer, Integer> result2 = playPar(loop, Parallele_Type.STATIC);
+		HashMap<Integer, Integer> result2 = playPar(repeat, Parallele_Type.STATIC);
 		end = System.currentTimeMillis();
 		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
 		// Affiche le resultat
-		printResult(loop, result2);
+		printResult(repeat, result2);
+		
+		begin = System.currentTimeMillis();
+		// Test en séquentiel
+		HashMap<Integer, Integer> result3 = playPar(repeat, Parallele_Type.DYNAMIC);
+		end = System.currentTimeMillis();
+		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
+		// Affiche le resultat
+		printResult(repeat, result3);
 		
 		begin = System.currentTimeMillis();
 		// Test en Sac de Täches
-		HashMap<Integer, Integer> result3 = playSAC(loop);
+		HashMap<Integer, Integer> result4 = playSAC(repeat);
 		end = System.currentTimeMillis();
 		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
 		// Affiche le resultat
-		printResult(loop, result3);
+		printResult(repeat, result4);
 
 
-		begin = System.currentTimeMillis();
-		// Test en séquentiel
-		HashMap<Integer, Integer> result3 = playPar(loop, Parallele_Type.DYNAMIC);
-		end = System.currentTimeMillis();
-		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
-		// Affiche le resultat
-		printResult(loop, result3);
+		
 
 
 	}
 
 
-	/**
-	 * Séquentiel
-	 */
-	private static HashMap<Integer,Integer> playSeq(int loop) throws Exception {
-		HashMap<Integer,Integer> result = initResult();
-		for (int i = 0; i < loop; i++) {
+	//================================================================================
+	// Version séquentielle
+	//================================================================================
+	private static HashMap<Integer,Integer> playSeq(int repeat) throws Exception {
+		HashMap<Integer,Integer> result = initResult(); // Initialise le HashMap des résultats
+		for (int i = 0; i < repeat; i++) {
 			int compteur = tirage();
 			result.put(compteur, result.get(compteur) + 1);
 		}
 		return result;
 	}
 
-	/**
-	 * Parallèle granularité forte en static
-	 */
-	private static HashMap<Integer,Integer> playPar(int loop, Parallele_Type type) throws Exception {
-		HashMap<Integer,Integer> result = initResult();
-
-		ExecutorService executor = Executors.newFixedThreadPool(_nbProcessors);
+	//================================================================================
+	// Version parallèle
+	//================================================================================
+	private static HashMap<Integer,Integer> playPar(int repeat, Parallele_Type type) throws Exception {
+		HashMap<Integer,Integer> result = initResult(); // Initialise le HashMap des résultats
+		ExecutorService executor = Executors.newFixedThreadPool(_nbProcessors); // On créé _nbProcessors de Thread
+		
 		Collection<Future<HashMap<Integer,Integer>>> resu = new ArrayList<Future<HashMap<Integer,Integer>>>();
-
 		Collection<TirageCallable> tasks = new ArrayList<Main.TirageCallable>();
 
+		// On récupère le type de parallèle choisit : STATIC ou DYNAMIC
+		// En STATIC on créé autant de tâches qu'il y a de processeurs
+		// En DYNAMIC on récupère le nombre de tâches à créer passé en paramètre du programme
 		int nbTaches = (type == Parallele_Type.STATIC) ? 
 				_nbProcessors : //STATIC
 					_nbTachesDynamic; //DYNAMIC
@@ -120,11 +124,12 @@ public class Main {
 
 		Main main = new Main();
 		for (int i = 0; i < nbTaches; i++) {
-			int nbParThread = getNbTachesParThread(i, loop, nbTaches);
-			tasks.add(main.new TirageCallable(nbParThread));
+			int nbElementsParTache = getNbElementsParTache(i, repeat, nbTaches); // Nombre d'éléments à traiter par tâche
+			tasks.add(main.new TirageCallable(nbElementsParTache)); // Ajoute la tâche à la liste
 		}
-		resu = executor.invokeAll(tasks);	
+		resu = executor.invokeAll(tasks); // Execute toutes les tâches (FORK)	
 
+		// On parcourt les résultat pour les merger quand ils sont disponible (JOIN)
 		for (Future<HashMap<Integer,Integer>> res : resu) {
 			for (Entry<Integer,Integer> e : res.get().entrySet()) {
 				Integer key = e.getKey();
@@ -137,7 +142,7 @@ public class Main {
 		return result;
 	}
 	
-	private static HashMap<Integer,Integer> playSAC(int loop) throws Exception {
+	private static HashMap<Integer,Integer> playSAC(int repeat) throws Exception {
 		HashMap<Integer,Integer> result = initResult();
 		
 		int nThreads = Runtime.getRuntime().availableProcessors();
@@ -150,7 +155,8 @@ public class Main {
 		
 		Main main = new Main();
 		for (int i = 0; i < nThreads; i++) {
-			tasks.add(main.new TirageCallable(loop / nThreads));
+			int nbParThread = getNbElementsParTache(i, repeat, nThreads);
+			tasks.add(main.new TirageCallable(nbParThread));
 		}
 		resu = executor.invokeAll(tasks);
 		
@@ -166,13 +172,37 @@ public class Main {
 		return result;
 	}
 
+	/**
+	 * TirageCallable représente une tâche, qui peut réaliser de 1 à x tirages (en fonction de la granularité)
+	 */
+	public class TirageCallable implements Callable<HashMap<Integer,Integer>> {
+		private int repeat = 0;
 
+		public TirageCallable(int repeat) {
+			this.repeat = repeat;
+		}
 
+		@Override
+		public HashMap<Integer,Integer> call() throws Exception {
+			HashMap<Integer,Integer> result = initResult();
+			for (int i = 0; i < repeat; i++) {
+				int compteur = tirage();
+				result.put(compteur, result.get(compteur) + 1);
+			}
+			return result;
+		}
+
+	}
+
+	
+	//================================================================================
+	// Outils
+	//================================================================================
 
 	/**
 	 * Découpe le nombres de tâches en fonction du nombre de Threads
 	 */
-	private static int getNbTachesParThread(int position, int nbTachesTotales, int nbThreads) {
+	private static int getNbElementsParTache(int position, int nbTachesTotales, int nbThreads) {
 		int nbParThread = (int) Math.ceil(nbTachesTotales / nbThreads);
 		nbParThread = ( (position * nbParThread) > nbTachesTotales) ?
 				nbTachesTotales - (nbParThread * (position-1)) : 
@@ -184,14 +214,13 @@ public class Main {
 	/**
 	 * Réalise un tirage au sort et retourne le nombre de numéros gagnants
 	 */
-	private static int tirage()
-			throws InterruptedException {
+	private static int tirage() throws InterruptedException {
 		List<Integer> numeros = new ArrayList<Integer>();
 		int numerosGagnants = 0;
 		for (int j = 0; j < _combinaison.size(); j++) {
 			int k = 0;
 			do {
-				k = getRandomValue(1, _range+1);
+				k = getRandomValue(1, _lotoRange+1);
 			} while (numeros.contains(k)); // un nombre ne peut être tiré qu'une seule fois
 			numeros.add(k);
 
@@ -228,31 +257,16 @@ public class Main {
 	}
 
 	/**
-	 * Obtient une valeur aléatoire
+	 * Obtient une valeur aléatoire (méthode Thread Safe)
 	 */
 	private static int getRandomValue(int i, int j) throws InterruptedException {
 		return ThreadLocalRandom.current().nextInt(i,j);
 	}
 
-	public class TirageCallable implements Callable<HashMap<Integer,Integer>> {
-		private int loop = 0;
-
-		public TirageCallable(int loop) {
-			this.loop = loop;
-		}
-
-		@Override
-		public HashMap<Integer,Integer> call() throws Exception {
-			HashMap<Integer,Integer> result = initResult();
-			for (int i = 0; i < loop; i++) {
-				int compteur = tirage();
-				result.put(compteur, result.get(compteur) + 1);
-			}
-			return result;
-		}
-
-	}
-
+	
+	/**
+	 * Enumération pour le parallèle STATIC ou DYNAMIC
+	 */
 	public enum Parallele_Type {
 		STATIC, DYNAMIC
 	}
