@@ -57,6 +57,15 @@ public class Main {
 		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
 		// Affiche le resultat
 		printResult(loop, result2);
+		
+		begin = System.currentTimeMillis();
+		// Test en Sac de Täches
+		HashMap<Integer, Integer> result3 = playSAC(loop);
+		end = System.currentTimeMillis();
+		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
+		// Affiche le resultat
+		printResult(loop, result3);
+
 
 
 	}
@@ -95,6 +104,35 @@ public class Main {
 		}
 		executor.shutdown();
 
+		return result;
+	}
+	
+	private static HashMap<Integer,Integer> playSAC(int loop) throws Exception {
+		HashMap<Integer,Integer> result = initResult();
+		
+		int nThreads = Runtime.getRuntime().availableProcessors();
+
+		ExecutorService executor = Executors.newCachedThreadPool();
+		Collection<Future<HashMap<Integer,Integer>>> resu = new ArrayList<Future<HashMap<Integer,Integer>>>();
+		
+		Collection<TirageCallable> tasks = new ArrayList<Main.TirageCallable>();
+				
+		
+		Main main = new Main();
+		for (int i = 0; i < nThreads; i++) {
+			tasks.add(main.new TirageCallable(loop / nThreads));
+		}
+		resu = executor.invokeAll(tasks);
+		
+		for (Future<HashMap<Integer,Integer>> res : resu) {
+			for (Entry<Integer,Integer> e : res.get().entrySet()) {
+				Integer key = e.getKey();
+				Integer value = e.getValue();
+				result.put(key, result.get(key) + value);
+			}
+		}
+		executor.shutdown();
+		
 		return result;
 	}
 
