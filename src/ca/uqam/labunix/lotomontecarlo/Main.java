@@ -32,24 +32,27 @@ public class Main {
 	 */
 	public static void main(String[] args) throws Exception {
 
+		// Vérifie les paramètres
 		if(args.length < 3) {
 			System.out.println("Nombres d'arguments incorrect");
 			System.exit(-1); 
 		}
 
-		// Récupère la combinaison en paramètre
+		// Récupère la combinaison gagnante
 		String[] combinaison = args[0].split("\\.");
 
 		for (String string : combinaison) {
 			_combinaison.add(Integer.parseInt(string));
 		}
 
-		// Récupère le nombre de tests en paramètre
+		// Récupère le nombre de tests à répeter
 		int repeat = Integer.parseInt(args[1]);
 
+		// Récupère le nombre de processeurs
 		int procs = Integer.parseInt(args[2]);
 		_nbProcessors = (procs == 0) ? Runtime.getRuntime().availableProcessors() : procs;
 
+		// Récupère le nombre de tâches à créer pour la version parallèle dynamique
 		_nbTachesDynamic = (args.length > 3) ? Integer.parseInt(args[3]) : 100;
 
 
