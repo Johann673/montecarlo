@@ -31,12 +31,12 @@ public class Main {
 	 * 		(Facultatif) 100 : nombre de tâches à créer pour la version parallele dynamic
 	 */
 	public static void main(String[] args) throws Exception {
-		
+
 		if(args.length < 3) {
 			System.out.println("Nombres d'arguments incorrect");
 			System.exit(-1); 
 		}
-		
+
 		// Récupère la combinaison en paramètre
 		String[] combinaison = args[0].split("\\.");
 
@@ -46,49 +46,54 @@ public class Main {
 
 		// Récupère le nombre de tests en paramètre
 		int repeat = Integer.parseInt(args[1]);
-		
+
 		int procs = Integer.parseInt(args[2]);
 		_nbProcessors = (procs == 0) ? Runtime.getRuntime().availableProcessors() : procs;
-		
+
 		_nbTachesDynamic = (args.length > 3) ? Integer.parseInt(args[3]) : 100;
 
 
-		long begin = System.currentTimeMillis();
-		// Test en séquentiel
-		//HashMap<Integer,Integer> result = playSeq(loop);
-		long end = System.currentTimeMillis();
-		//System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
-		// Affiche le resultat
-		//printResult(loop, result);
 
-		begin = System.currentTimeMillis();
-		// Test en séquentiel
-		HashMap<Integer, Integer> result2 = playPar(repeat, Parallele_Type.STATIC);
-		end = System.currentTimeMillis();
-		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
-		// Affiche le resultat
-		printResult(repeat, result2);
+
+
+		play(repeat, Type.SEQUENTIEL);
 		
-		begin = System.currentTimeMillis();
-		// Test en séquentiel
-		HashMap<Integer, Integer> result3 = playPar(repeat, Parallele_Type.DYNAMIC);
-		end = System.currentTimeMillis();
-		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
-		// Affiche le resultat
-		printResult(repeat, result3);
+		play(repeat, Type.PARA_STATIC);
 		
-		begin = System.currentTimeMillis();
+		play(repeat, Type.PARA_DYNAMIC);
+		
+		
+		
+		//............
+
+		long time = -System.currentTimeMillis();
 		// Test en Sac de Täches
 		HashMap<Integer, Integer> result4 = playSAC(repeat);
-		end = System.currentTimeMillis();
-		System.out.println("Time: " + (end - begin) / 1000.0 + " sec.");
+		time += System.currentTimeMillis();
+		System.out.println("Time: " + time / 1000.0 + " sec.");
 		// Affiche le resultat
 		printResult(repeat, result4);
 
+	}
 
-		
+	private static void play(int repeat, Type type) throws Exception {
+		long time = -System.currentTimeMillis();
+		HashMap<Integer,Integer> result = null;
 
+		switch (type) {
+			case SEQUENTIEL:
+				result = playSeq(repeat);
+				break;
+			case PARA_STATIC:
+			case PARA_DYNAMIC:
+				result = playPar(repeat, type);
+				break;
+		}
 
+		time += System.currentTimeMillis();
+		System.out.println("Time: " + time / 1000.0 + " sec.");
+		// Affiche le resultat
+		printResult(repeat, result);
 	}
 
 
@@ -107,17 +112,17 @@ public class Main {
 	//================================================================================
 	// Version parallèle
 	//================================================================================
-	private static HashMap<Integer,Integer> playPar(int repeat, Parallele_Type type) throws Exception {
+	private static HashMap<Integer,Integer> playPar(int repeat, Type type) throws Exception {
 		HashMap<Integer,Integer> result = initResult(); // Initialise le HashMap des résultats
 		ExecutorService executor = Executors.newFixedThreadPool(_nbProcessors); // On créé _nbProcessors de Thread
-		
+
 		Collection<Future<HashMap<Integer,Integer>>> resu = new ArrayList<Future<HashMap<Integer,Integer>>>();
 		Collection<TirageCallable> tasks = new ArrayList<Main.TirageCallable>();
 
 		// On récupère le type de parallèle choisit : STATIC ou DYNAMIC
 		// En STATIC on créé autant de tâches qu'il y a de processeurs
 		// En DYNAMIC on récupère le nombre de tâches à créer passé en paramètre du programme
-		int nbTaches = (type == Parallele_Type.STATIC) ? 
+		int nbTaches = (type == Type.PARA_STATIC) ? 
 				_nbProcessors : //STATIC
 					_nbTachesDynamic; //DYNAMIC
 
@@ -141,25 +146,25 @@ public class Main {
 
 		return result;
 	}
-	
+
 	private static HashMap<Integer,Integer> playSAC(int repeat) throws Exception {
 		HashMap<Integer,Integer> result = initResult();
-		
+
 		int nThreads = Runtime.getRuntime().availableProcessors();
 
 		ExecutorService executor = Executors.newCachedThreadPool();
 		Collection<Future<HashMap<Integer,Integer>>> resu = new ArrayList<Future<HashMap<Integer,Integer>>>();
-		
+
 		Collection<TirageCallable> tasks = new ArrayList<Main.TirageCallable>();
-				
-		
+
+
 		Main main = new Main();
 		for (int i = 0; i < nThreads; i++) {
 			int nbParThread = getNbElementsParTache(i, repeat, nThreads);
 			tasks.add(main.new TirageCallable(nbParThread));
 		}
 		resu = executor.invokeAll(tasks);
-		
+
 		for (Future<HashMap<Integer,Integer>> res : resu) {
 			for (Entry<Integer,Integer> e : res.get().entrySet()) {
 				Integer key = e.getKey();
@@ -168,7 +173,7 @@ public class Main {
 			}
 		}
 		executor.shutdown();
-		
+
 		return result;
 	}
 
@@ -194,7 +199,7 @@ public class Main {
 
 	}
 
-	
+
 	//================================================================================
 	// Outils
 	//================================================================================
@@ -263,12 +268,12 @@ public class Main {
 		return ThreadLocalRandom.current().nextInt(i,j);
 	}
 
-	
+
 	/**
 	 * Enumération pour le parallèle STATIC ou DYNAMIC
 	 */
-	public enum Parallele_Type {
-		STATIC, DYNAMIC
+	public enum Type {
+		SEQUENTIEL, PARA_STATIC, PARA_DYNAMIC
 	}
 
 }
