@@ -19,7 +19,7 @@ public class Main {
 	private static int _nbProcessors;
 	private static int _nbTachesDynamic = 100;
 
-	private static List<Integer> _combinaison = new ArrayList<Integer>();
+	private static List<Integer> _combinaison;
 
 	/**
 	 * arguments de la forme :
@@ -41,6 +41,7 @@ public class Main {
 		// Récupère la combinaison gagnante
 		String[] combinaison = args[0].split("\\.");
 
+		_combinaison = new ArrayList<Integer>();
 		for (String string : combinaison) {
 			_combinaison.add(Integer.parseInt(string));
 		}
@@ -60,52 +61,65 @@ public class Main {
 
 
 		play(repeat, Type.SEQUENTIEL);
-		
+
 		play(repeat, Type.PARA_STATIC);
-		
+
 		play(repeat, Type.PARA_DYNAMIC);
 		
-		
-		
+		play(repeat, Type.PARA_AUTOMATIC);
+
+
+
 		//............
 
-		long time = -System.currentTimeMillis();
+		/*long time = -System.currentTimeMillis();
 		// Test en Sac de Täches
 		HashMap<Integer, Integer> result4 = playSAC(repeat);
 		time += System.currentTimeMillis();
 		System.out.println("Time: " + time / 1000.0 + " sec.");
 		// Affiche le resultat
-		printResult(repeat, result4);
+		printResult(repeat, result4);*/
 
 	}
 
 	private static void play(int repeat, Type type) throws Exception {
 		long time = -System.currentTimeMillis();
 		HashMap<Integer,Integer> result = null;
+		String methode = "";
 
 		switch (type) {
 			case SEQUENTIEL:
+				methode = "sequentiel";
 				result = playSeq(repeat);
 				break;
 			case PARA_STATIC:
-			case PARA_DYNAMIC:
+				methode = "parallèle static";
 				result = playPar(repeat, type);
+				break;
+			case PARA_DYNAMIC:
+				methode = "parallèle dynamic";
+				result = playPar(repeat, type);
+				break;
+			case PARA_AUTOMATIC:
+				methode = "parallèle automatique";
+				result = playSAC(repeat);
 				break;
 		}
 
 		time += System.currentTimeMillis();
-		System.out.println("Time: " + time / 1000.0 + " sec.");
+
+		System.out.println("Méthode " + methode + " en " + time / 1000.0 + " sec.");
 		// Affiche le resultat
-		printResult(repeat, result);
+		//printResult(repeat, result);
 	}
 
 
 	//================================================================================
 	// Version séquentielle
 	//================================================================================
-	private static HashMap<Integer,Integer> playSeq(int repeat) throws Exception {
+	private static HashMap<Integer,Integer> playSeq(int n) throws Exception {
 		HashMap<Integer,Integer> result = initResult(); // Initialise le HashMap des résultats
-		for (int i = 0; i < repeat; i++) {
+		for (int i = 0; i < n; i++) { // réalise n tirage au sort
 			int compteur = tirage();
 			result.put(compteur, result.get(compteur) + 1);
 		}
@@ -115,7 +129,7 @@ public class Main {
 	//================================================================================
 	// Version parallèle
 	//================================================================================
-	private static HashMap<Integer,Integer> playPar(int repeat, Type type) throws Exception {
+	private static HashMap<Integer,Integer> playPar(int n, Type type) throws Exception {
 		HashMap<Integer,Integer> result = initResult(); // Initialise le HashMap des résultats
 		ExecutorService executor = Executors.newFixedThreadPool(_nbProcessors); // On créé _nbProcessors de Thread
 
@@ -132,7 +146,7 @@ public class Main {
 
 		Main main = new Main();
 		for (int i = 0; i < nbTaches; i++) {
-			int nbElementsParTache = getNbElementsParTache(i, repeat, nbTaches); // Nombre d'éléments à traiter par tâche
+			int nbElementsParTache = getNbElementsParTache(i, n, nbTaches); // Nombre d'éléments à traiter par tâche
 			tasks.add(main.new TirageCallable(nbElementsParTache)); // Ajoute la tâche à la liste
 		}
 		resu = executor.invokeAll(tasks); // Execute toutes les tâches (FORK)	
@@ -150,7 +164,7 @@ public class Main {
 		return result;
 	}
 
-	private static HashMap<Integer,Integer> playSAC(int repeat) throws Exception {
+	private static HashMap<Integer,Integer> playSAC(int n) throws Exception {
 		HashMap<Integer,Integer> result = initResult();
 
 		int nThreads = Runtime.getRuntime().availableProcessors();
@@ -163,7 +177,7 @@ public class Main {
 
 		Main main = new Main();
 		for (int i = 0; i < nThreads; i++) {
-			int nbParThread = getNbElementsParTache(i, repeat, nThreads);
+			int nbParThread = getNbElementsParTache(i, n, nThreads);
 			tasks.add(main.new TirageCallable(nbParThread));
 		}
 		resu = executor.invokeAll(tasks);
@@ -276,7 +290,7 @@ public class Main {
 	 * Enumération pour le parallèle STATIC ou DYNAMIC
 	 */
 	public enum Type {
-		SEQUENTIEL, PARA_STATIC, PARA_DYNAMIC
+		SEQUENTIEL, PARA_STATIC, PARA_DYNAMIC, PARA_AUTOMATIC
 	}
 
 }
