@@ -1,4 +1,3 @@
-package ca.uqam.labunix.lotomontecarlo;
 
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -14,10 +13,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Main {
-
+ 
 	private static int _lotoRange = 36;
 	private static int _nbProcessors;
 	private static int _nbTachesDynamic = 100;
+	private static int _repeat;
 
 	private static List<Integer> _combinaison;
 
@@ -32,85 +32,50 @@ public class Main {
 	 */
 	public static void main(String[] args) throws Exception {
 
-		// Vérifie les paramètres
-		if(args.length < 3) {
-			System.out.println("Nombres d'arguments incorrect");
-			System.exit(-1); 
-		}
-
-		// Récupère la combinaison gagnante
-		String[] combinaison = args[0].split("\\.");
-
-		_combinaison = new ArrayList<Integer>();
-		for (String string : combinaison) {
-			_combinaison.add(Integer.parseInt(string));
-		}
-
-		// Récupère le nombre de tests à répeter
-		int repeat = Integer.parseInt(args[1]);
-
-		// Récupère le nombre de processeurs
-		int procs = Integer.parseInt(args[2]);
-		_nbProcessors = (procs == 0) ? Runtime.getRuntime().availableProcessors() : procs;
-
-		// Récupère le nombre de tâches à créer pour la version parallèle dynamique
-		_nbTachesDynamic = (args.length > 3) ? Integer.parseInt(args[3]) : 100;
+		initialiseParamètres(args);
 
 
-
-
-
-		play(repeat, Type.SEQUENTIEL);
-
-		play(repeat, Type.PARA_STATIC);
-
-		play(repeat, Type.PARA_DYNAMIC);
-		
-		play(repeat, Type.PARA_AUTOMATIC);
-
-
-
-		//............
-
-		/*long time = -System.currentTimeMillis();
-		// Test en Sac de Täches
-		HashMap<Integer, Integer> result4 = playSAC(repeat);
+		// Test séquentielle
+		long time = -System.currentTimeMillis();
+		HashMap<Integer,Integer> res = play(_repeat, Type.SEQUENTIEL);
 		time += System.currentTimeMillis();
-		System.out.println("Time: " + time / 1000.0 + " sec.");
+		System.out.println("Méthode Séquentielle en " + time / 1000.0 + " sec.");
 		// Affiche le resultat
-		printResult(repeat, result4);*/
+		printResult(_repeat, res);
+
+		// Test parallèle statique
+		time = -System.currentTimeMillis();
+		res = play(_repeat, Type.PARA_STATIC);
+		time += System.currentTimeMillis();
+		System.out.println("Méthode Parallèle statique en " + time / 1000.0 + " sec.");
+		// Affiche le resultat
+		printResult(_repeat, res);
+		
+		// Test parallèle dynamique
+		time = -System.currentTimeMillis();
+		res = play(_repeat, Type.PARA_DYNAMIC);
+		time += System.currentTimeMillis();
+		System.out.println("Méthode Parallèle dynamique en " + time / 1000.0 + " sec.");
+		// Affiche le resultat
+		printResult(_repeat, res);
 
 	}
 
-	private static void play(int repeat, Type type) throws Exception {
-		long time = -System.currentTimeMillis();
+	public static HashMap<Integer,Integer> play(int repeat, Type type) throws Exception {
 		HashMap<Integer,Integer> result = null;
-		String methode = "";
-
 		switch (type) {
 			case SEQUENTIEL:
-				methode = "sequentiel";
 				result = playSeq(repeat);
 				break;
 			case PARA_STATIC:
-				methode = "parallèle static";
 				result = playPar(repeat, type);
 				break;
 			case PARA_DYNAMIC:
-				methode = "parallèle dynamic";
 				result = playPar(repeat, type);
-				break;
-			case PARA_AUTOMATIC:
-				methode = "parallèle automatique";
-				result = playSAC(repeat);
 				break;
 		}
 
-		time += System.currentTimeMillis();
-
-		System.out.println("Méthode " + methode + " en " + time / 1000.0 + " sec.");
-		// Affiche le resultat
-		//printResult(repeat, result);
+		return result;
 	}
 
 
@@ -164,36 +129,6 @@ public class Main {
 		return result;
 	}
 
-	private static HashMap<Integer,Integer> playSAC(int n) throws Exception {
-		HashMap<Integer,Integer> result = initResult();
-
-		int nThreads = Runtime.getRuntime().availableProcessors();
-
-		ExecutorService executor = Executors.newCachedThreadPool();
-		Collection<Future<HashMap<Integer,Integer>>> resu = new ArrayList<Future<HashMap<Integer,Integer>>>();
-
-		Collection<TirageCallable> tasks = new ArrayList<Main.TirageCallable>();
-
-
-		Main main = new Main();
-		for (int i = 0; i < nThreads; i++) {
-			int nbParThread = getNbElementsParTache(i, n, nThreads);
-			tasks.add(main.new TirageCallable(nbParThread));
-		}
-		resu = executor.invokeAll(tasks);
-
-		for (Future<HashMap<Integer,Integer>> res : resu) {
-			for (Entry<Integer,Integer> e : res.get().entrySet()) {
-				Integer key = e.getKey();
-				Integer value = e.getValue();
-				result.put(key, result.get(key) + value);
-			}
-		}
-		executor.shutdown();
-
-		return result;
-	}
-
 	/**
 	 * TirageCallable représente une tâche, qui peut réaliser de 1 à x tirages (en fonction de la granularité)
 	 */
@@ -221,6 +156,35 @@ public class Main {
 	// Outils
 	//================================================================================
 
+	/**
+	 * Initialise les paramètres de l'application
+	 */
+	public static void initialiseParamètres(String[] args) {
+		// Vérifie les paramètres
+		if(args.length < 3) {
+			System.out.println("Nombres d'arguments incorrect");
+			System.exit(-1); 
+		}
+
+		// Récupère la combinaison gagnante
+		String[] combinaison = args[0].split("\\.");
+
+		_combinaison = new ArrayList<Integer>();
+		for (String string : combinaison) {
+			_combinaison.add(Integer.parseInt(string));
+		}
+
+		// Récupère le nombre de tests à répeter
+		_repeat = Integer.parseInt(args[1]);
+
+		// Récupère le nombre de processeurs
+		int procs = Integer.parseInt(args[2]);
+		_nbProcessors = (procs == 0) ? Runtime.getRuntime().availableProcessors() : procs;
+
+		// Récupère le nombre de tâches à créer pour la version parallèle dynamique
+		_nbTachesDynamic = (args.length > 3) ? Integer.parseInt(args[3]) : 100;
+	}
+	
 	/**
 	 * Découpe le nombres de tâches en fonction du nombre de Threads
 	 */
@@ -258,7 +222,7 @@ public class Main {
 	/**
 	 * Affiche les résultats en pourcentage
 	 */
-	private static void printResult(int loop, HashMap<Integer,Integer> result) {
+	public static void printResult(int loop, HashMap<Integer,Integer> result) {
 		NumberFormat format = new DecimalFormat("0.00000");
 		for (Entry<Integer,Integer> e : result.entrySet()) {
 			Integer key = e.getKey();
@@ -283,14 +247,6 @@ public class Main {
 	 */
 	private static int getRandomValue(int i, int j) throws InterruptedException {
 		return ThreadLocalRandom.current().nextInt(i,j);
-	}
-
-
-	/**
-	 * Enumération pour le parallèle STATIC ou DYNAMIC
-	 */
-	public enum Type {
-		SEQUENTIEL, PARA_STATIC, PARA_DYNAMIC, PARA_AUTOMATIC
 	}
 
 }
